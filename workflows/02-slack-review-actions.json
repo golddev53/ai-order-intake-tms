@@ -1,0 +1,694 @@
+{
+  "id": "aiIntakeReview01",
+  "name": "AI Order Intake - Slack Review Actions",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Review links\nApprove / Reject buttons in Slack open this webhook. Links are HMAC-signed and expire after 24 hours.",
+        "width": 760,
+        "height": 320,
+        "color": 6
+      },
+      "id": "a66e1004-3789-5c65-a97a-9e7768c30c51",
+      "name": "Review links",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "order-review",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8d120e1c-e65f-58fb-845c-2c35dfee6fef",
+      "name": "Webhook: Review Action",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "87b6d573-28e4-54ad-86c7-e26956a7b6ee"
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ ($json.query.shipment_id ?? '') + '.' + ($json.query.exp ?? '') }}",
+        "dataPropertyName": "expected_sig",
+        "secret": "={{ $env.REVIEW_SIGNING_SECRET }}",
+        "encoding": "hex"
+      },
+      "id": "4c673231-d3be-53f2-8bfb-fd821fb935b0",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// expected_sig comes from \"Verify Signature\" (HMAC of shipment_id.exp with REVIEW_SIGNING_SECRET).\nconst { shipment_id, action, exp, sig } = $json.query ?? {};\nconst expected = $json.expected_sig ?? '';\n\nlet diff = typeof sig === 'string' && sig.length === expected.length ? 0 : 1;\nfor (let i = 0; !diff && i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);\n\nlet reason = null;\nif (diff) reason = 'This review link is not valid.';\nelse if (Number(exp) < Date.now() / 1000) reason = 'This review link has expired. Open the order in the TMS instead.';\nelse if (!['approve', 'reject'].includes(action)) reason = `Unknown action \"${action}\".`;\n\nreturn { json: { valid: !reason, reason, shipment_id, action } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "0fd30adb-ef89-5b42-8301-10ac5e5b6d80",
+      "name": "Check Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "5062ba49-51fa-5e54-bc42-2a7603e42d2e",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b2738822-dc0e-591d-bc50-b530c0926905",
+      "name": "Link Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.TMS_BASE_URL }}/api/v1/shipments/{{ $json.shipment_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.TMS_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "6c1e0c8c-d5c0-523c-ba59-50a103df267f",
+      "name": "TMS: Get Shipment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        -120
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "f4669a89-cf54-5c0c-96b2-d749a446581f",
+              "leftValue": "={{ $json.status === 'draft' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a3fff8b1-5bed-5735-819a-54fb7656aa27",
+      "name": "Still a Draft?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "bbd6ef9a-ca20-5277-974c-2a4c123b9992",
+              "leftValue": "={{ $('Check Link').item.json.action === 'approve' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f3e894a2-e6bb-5fff-af58-7dfd03dfc446",
+      "name": "Approve?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.TMS_BASE_URL }}/api/v1/shipments/{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.TMS_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'booked', note: 'Approved in Slack' }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "08682e02-b842-554e-8dd4-c816be6df6b6",
+      "name": "TMS: Book Shipment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -360
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TMS_BASE_URL }}/api/v1/shipments/{{ $json.id }}/dispatch",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.TMS_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "e83968a4-913f-5633-9385-49633ec44b00",
+      "name": "TMS: Dispatch Approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        -360
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input is a dispatched TMS shipment. Shared by the intake and review workflows.\nconst s = $json;\nconst at = (t) => (t ? String(t).replace('T', ' ') : 'TBD');\nconst place = (stop = {}) => stop.formatted_address || [stop.street, stop.city, stop.state, stop.zip].filter(Boolean).join(', ');\nconst ref = s.reference_number ? ` (your ref ${s.reference_number})` : '';\n\nconst body = [\n  `Hi ${s.customer?.contact_name ?? 'there'},`,\n  '',\n  `Your delivery is booked${ref}.`,\n  '',\n  `Shipment:      ${s.id}`,\n  `Pickup:        ${place(s.pickup)}`,\n  `Pickup ETA:    ${at(s.route?.pickup_eta)}`,\n  `Deliver to:    ${place(s.dropoff)}`,\n  `Delivery ETA:  ${at(s.route?.eta)}`,\n  `Vehicle:       ${s.vehicle_type ?? 'Assigned by dispatch'}`,\n  `Driver:        ${s.route?.driver?.name ?? 'Assigned shortly'}`,\n  s.price != null ? `Price:         $${s.price.toFixed(2)}` : null,\n  '',\n  s.route?.tracking_url ? `Track it live: ${s.route.tracking_url}` : null,\n  '',\n  'Reply to this email if anything needs to change.',\n  '',\n  'Dispatch team',\n].filter((line) => line !== null);\n\nreturn {\n  json: {\n    shipment_id: s.id,\n    email: {\n      personalizations: [{ to: [{ email: s.customer?.email }] }],\n      subject: `Booked: ${s.id}${ref}`,\n      content: [{ type: 'text/plain', value: body.join('\\n') }],\n    },\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "c2577ea7-6f43-58b0-a065-f50c10e8096a",
+      "name": "Compose Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SENDGRID_BASE_URL || 'https://api.sendgrid.com' }}/v3/mail/send",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SENDGRID_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ...$json.email, from: { email: $env.FROM_EMAIL || 'dispatch@example.com', name: $env.FROM_NAME || 'Dispatch' } }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "a2d4013f-7a5f-5a00-a92b-5ac684635342",
+      "name": "Email: Customer Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        -360
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: ((s) => `:white_check_mark: ${s.id} approved and dispatched on ${s.route.id} (${s.route.driver.name}), pickup ETA ${s.route.pickup_eta}`)($('TMS: Dispatch Approved').item.json) }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "f187ceb7-4018-5258-9b83-906c300c0d7a",
+      "name": "Slack: Approved Notice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        -360
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the page shown in the reviewer's browser. approved is set per node by build.py.\nconst outcome = 'approved';\nconst s = outcome === 'approved' ? $('TMS: Dispatch Approved').item.json\n  : outcome === 'rejected' ? $('TMS: Cancel Shipment').item.json\n  : $json;\n\nconst pages = {\n  invalid: () => ({ http_status: 403, tone: 'bad', title: 'Link not valid', message: s.reason }),\n  handled: () => ({\n    http_status: 409,\n    tone: 'info',\n    title: `Already ${s.status}`,\n    message: `Shipment ${s.id} is already ${s.status}, so nothing was changed.`,\n  }),\n  approved: () => ({\n    http_status: 200,\n    tone: 'good',\n    title: `${s.id} approved`,\n    message: `Booked and dispatched on route ${s.route?.id} with ${s.route?.driver?.name}. Pickup ETA ${String(s.route?.pickup_eta).replace('T', ' ')}. The customer has been emailed.`,\n  }),\n  rejected: () => ({\n    http_status: 200,\n    tone: 'bad',\n    title: `${s.id} rejected`,\n    message: 'The draft was cancelled in the TMS. Reply to the customer if you need more details from them.',\n  }),\n};\n\nreturn { json: pages[outcome]() };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "7af30ccc-30a0-5407-ba3b-55a0ab942515",
+      "name": "Page: Approved",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.TMS_BASE_URL }}/api/v1/shipments/{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.TMS_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'cancelled', note: 'Rejected in Slack' }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "156d8f4e-31ae-520f-98b4-3e884df047dd",
+      "name": "TMS: Cancel Shipment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -120
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: `:x: ${$json.id} was rejected and cancelled in the TMS` }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "1578cfe8-2df1-5116-9bfa-d85814356b47",
+      "name": "Slack: Rejected Notice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        -120
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the page shown in the reviewer's browser. rejected is set per node by build.py.\nconst outcome = 'rejected';\nconst s = outcome === 'approved' ? $('TMS: Dispatch Approved').item.json\n  : outcome === 'rejected' ? $('TMS: Cancel Shipment').item.json\n  : $json;\n\nconst pages = {\n  invalid: () => ({ http_status: 403, tone: 'bad', title: 'Link not valid', message: s.reason }),\n  handled: () => ({\n    http_status: 409,\n    tone: 'info',\n    title: `Already ${s.status}`,\n    message: `Shipment ${s.id} is already ${s.status}, so nothing was changed.`,\n  }),\n  approved: () => ({\n    http_status: 200,\n    tone: 'good',\n    title: `${s.id} approved`,\n    message: `Booked and dispatched on route ${s.route?.id} with ${s.route?.driver?.name}. Pickup ETA ${String(s.route?.pickup_eta).replace('T', ' ')}. The customer has been emailed.`,\n  }),\n  rejected: () => ({\n    http_status: 200,\n    tone: 'bad',\n    title: `${s.id} rejected`,\n    message: 'The draft was cancelled in the TMS. Reply to the customer if you need more details from them.',\n  }),\n};\n\nreturn { json: pages[outcome]() };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "232570ef-b1b0-5f89-91ff-a59620351500",
+      "name": "Page: Rejected",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the page shown in the reviewer's browser. handled is set per node by build.py.\nconst outcome = 'handled';\nconst s = outcome === 'approved' ? $('TMS: Dispatch Approved').item.json\n  : outcome === 'rejected' ? $('TMS: Cancel Shipment').item.json\n  : $json;\n\nconst pages = {\n  invalid: () => ({ http_status: 403, tone: 'bad', title: 'Link not valid', message: s.reason }),\n  handled: () => ({\n    http_status: 409,\n    tone: 'info',\n    title: `Already ${s.status}`,\n    message: `Shipment ${s.id} is already ${s.status}, so nothing was changed.`,\n  }),\n  approved: () => ({\n    http_status: 200,\n    tone: 'good',\n    title: `${s.id} approved`,\n    message: `Booked and dispatched on route ${s.route?.id} with ${s.route?.driver?.name}. Pickup ETA ${String(s.route?.pickup_eta).replace('T', ' ')}. The customer has been emailed.`,\n  }),\n  rejected: () => ({\n    http_status: 200,\n    tone: 'bad',\n    title: `${s.id} rejected`,\n    message: 'The draft was cancelled in the TMS. Reply to the customer if you need more details from them.',\n  }),\n};\n\nreturn { json: pages[outcome]() };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "f1be6442-a983-5d58-b0b4-8fb9b8f31c69",
+      "name": "Page: Already Handled",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the page shown in the reviewer's browser. invalid is set per node by build.py.\nconst outcome = 'invalid';\nconst s = outcome === 'approved' ? $('TMS: Dispatch Approved').item.json\n  : outcome === 'rejected' ? $('TMS: Cancel Shipment').item.json\n  : $json;\n\nconst pages = {\n  invalid: () => ({ http_status: 403, tone: 'bad', title: 'Link not valid', message: s.reason }),\n  handled: () => ({\n    http_status: 409,\n    tone: 'info',\n    title: `Already ${s.status}`,\n    message: `Shipment ${s.id} is already ${s.status}, so nothing was changed.`,\n  }),\n  approved: () => ({\n    http_status: 200,\n    tone: 'good',\n    title: `${s.id} approved`,\n    message: `Booked and dispatched on route ${s.route?.id} with ${s.route?.driver?.name}. Pickup ETA ${String(s.route?.pickup_eta).replace('T', ' ')}. The customer has been emailed.`,\n  }),\n  rejected: () => ({\n    http_status: 200,\n    tone: 'bad',\n    title: `${s.id} rejected`,\n    message: 'The draft was cancelled in the TMS. Reply to the customer if you need more details from them.',\n  }),\n};\n\nreturn { json: pages[outcome]() };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "bfc9bffe-974b-5e2e-acd1-d9a5e90c3e0c",
+      "name": "Page: Invalid Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<!doctype html>\n<html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>{{ $json.title }}</title>\n<style>\nbody{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b1020;font:16px/1.6 system-ui,sans-serif;color:#e6ebf5}\n.card{max-width:520px;margin:24px;padding:32px;border-radius:16px;background:#131c33;border:1px solid rgba(148,163,184,.2);border-top:4px solid #22d3ee}\n.good{border-top-color:#34d399}.bad{border-top-color:#f87171}\nh1{margin:0 0 8px;font-size:22px}p{margin:0;color:#94a3b8}\n</style></head>\n<body><div class=\"card {{ $json.tone }}\"><h1>{{ $json.title }}</h1><p>{{ $json.message }}</p></div></body></html>",
+        "options": {
+          "responseCode": "={{ $json.http_status }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "640729da-65c0-594e-8464-be1e5e381f35",
+      "name": "Respond: Result Page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2860,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: Review Action": {
+      "main": [
+        [
+          {
+            "node": "Verify Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signature": {
+      "main": [
+        [
+          {
+            "node": "Check Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Link": {
+      "main": [
+        [
+          {
+            "node": "Link Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Link Valid?": {
+      "main": [
+        [
+          {
+            "node": "TMS: Get Shipment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Page: Invalid Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TMS: Get Shipment": {
+      "main": [
+        [
+          {
+            "node": "Still a Draft?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still a Draft?": {
+      "main": [
+        [
+          {
+            "node": "Approve?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Page: Already Handled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approve?": {
+      "main": [
+        [
+          {
+            "node": "TMS: Book Shipment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TMS: Cancel Shipment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TMS: Book Shipment": {
+      "main": [
+        [
+          {
+            "node": "TMS: Dispatch Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TMS: Dispatch Approved": {
+      "main": [
+        [
+          {
+            "node": "Compose Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Email: Customer Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email: Customer Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Slack: Approved Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Approved Notice": {
+      "main": [
+        [
+          {
+            "node": "Page: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TMS: Cancel Shipment": {
+      "main": [
+        [
+          {
+            "node": "Slack: Rejected Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Rejected Notice": {
+      "main": [
+        [
+          {
+            "node": "Page: Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page: Approved": {
+      "main": [
+        [
+          {
+            "node": "Respond: Result Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page: Rejected": {
+      "main": [
+        [
+          {
+            "node": "Respond: Result Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page: Already Handled": {
+      "main": [
+        [
+          {
+            "node": "Respond: Result Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page: Invalid Link": {
+      "main": [
+        [
+          {
+            "node": "Respond: Result Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "errorWorkflow": "aiIntakeAlerts01"
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

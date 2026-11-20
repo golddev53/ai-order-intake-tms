@@ -1,0 +1,1294 @@
+{
+  "id": "aiIntakeMain0001",
+  "name": "AI Order Intake -> TMS",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 1. Intake\nEvery channel is normalized into one envelope. Enable the email, Shopify and Drive triggers after adding their credentials.",
+        "width": 900,
+        "height": 940,
+        "color": 7
+      },
+      "id": "cecbe15d-d5b0-5712-902c-eeeea677c5e2",
+      "name": "1. Intake",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. AI extraction\nUnstructured text goes to the LLM, which must answer with the strict LogisticsOrder JSON schema and a confidence score.",
+        "width": 920,
+        "height": 400,
+        "color": 6
+      },
+      "id": "ecae3742-bddd-5ff7-b9a6-017cb2da0755",
+      "name": "2. AI extraction",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3. Validate & enrich\nClean fields, build the idempotency key, verify both addresses with Google Maps.",
+        "width": 1100,
+        "height": 340,
+        "color": 4
+      },
+      "id": "e4864824-485e-5170-b6b3-6c6862724e28",
+      "name": "3. Validate & enrich",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4. Dedupe & quote\nSkip orders already in the TMS, then get a price and vehicle from the TMS.",
+        "width": 640,
+        "height": 520,
+        "color": 3
+      },
+      "id": "bf8db434-8634-5098-a0a4-8fcca54a44c7",
+      "name": "4. Dedupe & quote",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3040,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5. Book or review\nClean orders are booked, dispatched and confirmed. Anything uncertain becomes a draft and goes to Slack for approval.",
+        "width": 1520,
+        "height": 640,
+        "color": 5
+      },
+      "id": "2153cc99-6e6b-5fee-9d12-6a13eea605ae",
+      "name": "5. Book or review",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3700,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "order-intake",
+        "responseMode": "lastNode",
+        "options": {},
+        "responseData": "firstEntryJson"
+      },
+      "id": "bc1bcb8a-5a9a-5d72-a12b-badae57310b7",
+      "name": "Webhook: Order Intake",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "aff9809b-581b-5aa9-bc73-c76ec2d7a005"
+    },
+    {
+      "parameters": {
+        "format": "resolved",
+        "options": {}
+      },
+      "id": "56b0925b-f0e0-522c-aa80-3d4a5fc6c894",
+      "name": "Email: Orders Inbox",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "topic": "orders/create"
+      },
+      "id": "9b4615e9-4d36-5ff1-87df-ee7449026d3d",
+      "name": "Shopify: Order Created",
+      "type": "n8n-nodes-base.shopifyTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        400
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "id": "bdc77eb1-6b0b-5640-b1ef-d631d1bb1757",
+      "name": "Drive: New CSV in Folder",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        600
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "attachment_0",
+        "options": {}
+      },
+      "id": "f0f20904-8c77-5256-9928-a0e521b5e3b8",
+      "name": "Extract PDF Attachment",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        220,
+        200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "6adf4f90-9508-5393-97e9-4bb101e71d54",
+      "name": "Drive: Download CSV",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        220,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "csv",
+        "options": {}
+      },
+      "id": "d4fb1713-767b-5e2e-b258-3f5c2f8e309d",
+      "name": "Parse CSV Rows",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        440,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Webhook body is either an unstructured order ({ from, subject, text }) such as a forwarded\n// email or pasted PDF text, or a structured order ({ source, order }) from a portal or ERP.\nreturn $input.all().map((item, i) => {\n  const body = item.json.body ?? {};\n  return {\n    json: {\n      intake_id: `${$execution.id}-wh-${i}`,\n      source: body.source || 'webhook',\n      received_at: new Date().toISOString(),\n      sender_email: body.from ?? null,\n      subject: body.subject ?? null,\n      raw_text: body.text ?? null,\n      order: body.order ?? null,\n      extraction: body.order ? { method: 'structured', confidence: 1, missing_fields: [] } : null,\n    },\n  };\n});\n"
+      },
+      "id": "fe8dd86f-4822-5d49-a076-30f8c07e9374",
+      "name": "Normalize: Webhook",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input items come from \"Extract PDF Attachment\", which errors (and passes { error }) when the\n// email has no PDF, so the email itself is read from the trigger.\nreturn $input.all().map((item, i) => {\n  const email = $('Email: Orders Inbox').itemMatching(i).json;\n  const pdfText = item.json.error ? '' : item.json.text ?? '';\n  const body = email.text || String(email.html ?? '').replace(/<[^>]+>/g, ' ');\n\n  return {\n    json: {\n      intake_id: `${$execution.id}-mail-${i}`,\n      source: 'email',\n      received_at: email.date ? new Date(email.date).toISOString() : new Date().toISOString(),\n      sender_email: email.from?.value?.[0]?.address ?? null,\n      subject: email.subject ?? null,\n      raw_text: [body, pdfText && `--- PDF attachment ---\\n${pdfText}`].filter(Boolean).join('\\n\\n'),\n      order: null,\n      extraction: null,\n    },\n  };\n});\n"
+      },
+      "id": "a073da0e-f074-57ff-9495-44c5750b8c6e",
+      "name": "Normalize: Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shopify orders/create payload. Pickup is left empty so \"Validate & Normalize Order\" uses the\n// default warehouse from the config.\nreturn $input.all().map((item, i) => {\n  const o = item.json;\n  const ship = o.shipping_address ?? {};\n\n  return {\n    json: {\n      intake_id: `${$execution.id}-shop-${i}`,\n      source: 'shopify',\n      received_at: o.created_at ?? new Date().toISOString(),\n      sender_email: o.email ?? null,\n      subject: `Shopify order ${o.name ?? o.id}`,\n      raw_text: null,\n      order: {\n        customer: {\n          company: ship.company ?? null,\n          contact_name: ship.name ?? null,\n          email: o.email ?? o.customer?.email ?? null,\n          phone: ship.phone ?? o.phone ?? o.customer?.phone ?? null,\n        },\n        reference_number: o.name ?? String(o.id),\n        service_level: /same.?day/i.test(o.shipping_lines?.[0]?.title ?? '') ? 'same_day' : 'scheduled',\n        pickup: null,\n        dropoff: {\n          name: ship.company || ship.name || null,\n          street: [ship.address1, ship.address2].filter(Boolean).join(' ') || null,\n          city: ship.city ?? null,\n          state: ship.province_code ?? null,\n          zip: ship.zip ?? null,\n          window_start: null,\n          window_end: null,\n          instructions: o.note ?? null,\n        },\n        items: (o.line_items ?? []).map((li) => ({\n          description: li.title,\n          quantity: li.quantity ?? 1,\n          unit: 'box',\n          weight_lbs: li.grams ? Math.round(((li.grams * (li.quantity ?? 1)) / 453.6) * 10) / 10 : null,\n        })),\n        vehicle_type: null,\n        special_instructions: o.note ?? null,\n      },\n      extraction: { method: 'structured', confidence: 1, missing_fields: [] },\n    },\n  };\n});\n"
+      },
+      "id": "e0dabcb5-a68a-596b-8dc6-b983e9bcc0b8",
+      "name": "Normalize: Shopify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per CSV row. Column names match samples/orders.csv.\nconst fileName = $('Drive: New CSV in Folder').first().json.name ?? 'upload.csv';\n\nreturn $input.all().map((item, i) => {\n  const r = item.json;\n  const stop = (prefix) => ({\n    name: r[`${prefix}_name`] || null,\n    street: r[`${prefix}_street`] || null,\n    city: r[`${prefix}_city`] || null,\n    state: r[`${prefix}_state`] || null,\n    zip: r[`${prefix}_zip`] || null,\n    window_start: r[`${prefix}_window_start`] || null,\n    window_end: r[`${prefix}_window_end`] || null,\n    instructions: r[`${prefix}_instructions`] || null,\n  });\n\n  return {\n    json: {\n      intake_id: `${$execution.id}-csv-${i}`,\n      source: 'csv',\n      received_at: new Date().toISOString(),\n      sender_email: r.contact_email || null,\n      subject: `${fileName} row ${i + 2}`,\n      raw_text: null,\n      order: {\n        customer: {\n          company: r.customer_company || null,\n          contact_name: r.contact_name || null,\n          email: r.contact_email || null,\n          phone: r.contact_phone || null,\n        },\n        reference_number: r.reference_number || null,\n        service_level: r.service_level || 'scheduled',\n        pickup: stop('pickup'),\n        dropoff: stop('dropoff'),\n        items: [{\n          description: r.items_description || 'Freight',\n          quantity: parseInt(r.quantity, 10) || null,\n          unit: r.unit || 'other',\n          weight_lbs: parseFloat(r.weight_lbs) || null,\n        }],\n        vehicle_type: r.vehicle_type || null,\n        special_instructions: r.notes || null,\n      },\n      extraction: { method: 'structured', confidence: 1, missing_fields: [] },\n    },\n  };\n});\n"
+      },
+      "id": "ed5e0c18-758f-5c1f-8f60-c317769c3cbe",
+      "name": "Normalize: CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e5b87c5c-036d-59db-8629-b591409ce9c5",
+              "name": "config",
+              "value": "={{ {\n  openai_model: $env.OPENAI_MODEL || 'gpt-4o-mini',\n  timezone: $env.GENERIC_TIMEZONE || 'America/Los_Angeles',\n  min_confidence: Number($env.AUTO_APPROVE_MIN_CONFIDENCE || 0.85),\n  max_auto_price: Number($env.AUTO_APPROVE_MAX_PRICE || 1500),\n  public_url: ($env.N8N_WEBHOOK_URL || $env.WEBHOOK_URL || 'http://localhost:5678/').replace(/\\/+$/, ''),\n  tms_ui_url: ($env.TMS_UI_URL || $env.TMS_BASE_URL || '').replace(/\\/+$/, ''),\n  default_pickup: {\n    name: $env.DEFAULT_PICKUP_NAME || 'Main Warehouse',\n    street: $env.DEFAULT_PICKUP_STREET || null,\n    city: $env.DEFAULT_PICKUP_CITY || null,\n    state: $env.DEFAULT_PICKUP_STATE || null,\n    zip: $env.DEFAULT_PICKUP_ZIP || null\n  }\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4e574fec-1dd4-5476-b115-cd8d2fd1dcbc",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "91956993-56bb-515a-8577-a8d5d59feee9",
+              "leftValue": "={{ !$json.order }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1c026fb3-4a63-5d7d-82ce-432dba63078d",
+      "name": "Needs AI Extraction?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Load Config').first().json.config;\nconst ORDER_SCHEMA = {\n  \"type\": \"object\",\n  \"additionalProperties\": false,\n  \"required\": [\n    \"customer\",\n    \"reference_number\",\n    \"service_level\",\n    \"pickup\",\n    \"dropoff\",\n    \"items\",\n    \"vehicle_type\",\n    \"special_instructions\",\n    \"confidence\",\n    \"missing_fields\"\n  ],\n  \"properties\": {\n    \"customer\": {\n      \"type\": \"object\",\n      \"additionalProperties\": false,\n      \"required\": [\n        \"company\",\n        \"contact_name\",\n        \"email\",\n        \"phone\"\n      ],\n      \"properties\": {\n        \"company\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"contact_name\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"email\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"phone\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        }\n      }\n    },\n    \"reference_number\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ],\n      \"description\": \"Customer PO, order or reference number.\"\n    },\n    \"service_level\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"same_day\",\n        \"scheduled\",\n        \"recurring\"\n      ]\n    },\n    \"pickup\": {\n      \"$ref\": \"#/$defs/stop\"\n    },\n    \"dropoff\": {\n      \"$ref\": \"#/$defs/stop\"\n    },\n    \"items\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"additionalProperties\": false,\n        \"required\": [\n          \"description\",\n          \"quantity\",\n          \"unit\",\n          \"weight_lbs\"\n        ],\n        \"properties\": {\n          \"description\": {\n            \"type\": \"string\"\n          },\n          \"quantity\": {\n            \"type\": [\n              \"integer\",\n              \"null\"\n            ]\n          },\n          \"unit\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"pallet\",\n              \"box\",\n              \"piece\",\n              \"other\"\n            ]\n          },\n          \"weight_lbs\": {\n            \"type\": [\n              \"number\",\n              \"null\"\n            ]\n          }\n        }\n      }\n    },\n    \"vehicle_type\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ],\n      \"description\": \"Only if the customer asked for a specific vehicle.\"\n    },\n    \"special_instructions\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"confidence\": {\n      \"type\": \"number\",\n      \"description\": \"0-1. How sure you are that every extracted field is correct and complete.\"\n    },\n    \"missing_fields\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"description\": \"Dotted paths of required fields that were not in the text, e.g. pickup.zip.\"\n    }\n  },\n  \"$defs\": {\n    \"stop\": {\n      \"type\": \"object\",\n      \"additionalProperties\": false,\n      \"required\": [\n        \"name\",\n        \"street\",\n        \"city\",\n        \"state\",\n        \"zip\",\n        \"window_start\",\n        \"window_end\",\n        \"instructions\"\n      ],\n      \"properties\": {\n        \"name\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"street\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"city\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"state\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ],\n          \"description\": \"2-letter US state code.\"\n        },\n        \"zip\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"window_start\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"window_end\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"instructions\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        }\n      }\n    }\n  }\n};\n\nconst system = [\n  'You extract B2B delivery orders for a logistics company and return JSON matching the schema.',\n  'Rules:',\n  '- Use only information in the message. Never invent addresses, dates, phone numbers or references. Use null when a value is missing and list its path in missing_fields.',\n  '- Resolve relative dates (\"tomorrow\", \"Monday\") from the received timestamp and timezone.',\n  '- Times are local, formatted YYYY-MM-DDTHH:MM. A single \"deliver by\" time is dropoff.window_end.',\n  '- state is the 2-letter US code and zip is 5 digits.',\n  '- customer is the company placing the order. Use the sender email if no other contact email is given.',\n  '- service_level is same_day for today/ASAP/urgent, recurring if it repeats, otherwise scheduled.',\n  '- confidence is 0.95 or higher only when both full addresses, the pickup time and the item quantities are stated explicitly.',\n].join('\\n');\n\nconst user = [\n  `Received: ${$json.received_at} (timezone ${cfg.timezone})`,\n  `From: ${$json.sender_email ?? 'unknown'}`,\n  `Subject: ${$json.subject ?? ''}`,\n  '',\n  $json.raw_text ?? '',\n].join('\\n');\n\nreturn {\n  json: {\n    ...$json,\n    ai_request: {\n      model: cfg.openai_model,\n      temperature: 0,\n      response_format: {\n        type: 'json_schema',\n        json_schema: { name: 'logistics_order', strict: true, schema: ORDER_SCHEMA },\n      },\n      messages: [\n        { role: 'system', content: system },\n        { role: 'user', content: user },\n      ],\n    },\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "1c5de56c-eb3a-581a-9557-ecfbe641f493",
+      "name": "Build AI Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OPENAI_BASE_URL || 'https://api.openai.com/v1' }}/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.ai_request) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "5055bb2b-9f64-54cd-9daf-426453fcd6c6",
+      "name": "AI: Extract Order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const { ai_request, ...envelope } = $('Build AI Request').item.json;\nconst content = $json.choices?.[0]?.message?.content;\n\nlet extracted;\ntry {\n  extracted = JSON.parse(content);\n} catch (e) {\n  throw new Error(`AI returned invalid JSON for intake ${envelope.intake_id}: ${String(content).slice(0, 200)}`);\n}\n\nconst { confidence = 0, missing_fields = [], ...order } = extracted;\n\nreturn {\n  json: {\n    ...envelope,\n    order,\n    extraction: { method: 'ai', model: $json.model, confidence, missing_fields },\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "c2770661-1aa7-5246-bd61-7866d7cceadb",
+      "name": "Parse AI Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Load Config').first().json.config;\n\nconst clean = (v) => (typeof v === 'string' ? v.trim().replace(/\\s+/g, ' ') || null : v ?? null);\n\nconst phone = (p) => {\n  const d = String(p ?? '').replace(/\\D/g, '');\n  if (d.length === 10) return `+1${d}`;\n  if (d.length === 11 && d.startsWith('1')) return `+${d}`;\n  return null;\n};\n\nconst time = (t) => {\n  const m = String(t ?? '').match(/^(\\d{4}-\\d{2}-\\d{2})[T ](\\d{1,2}):(\\d{2})/);\n  return m ? `${m[1]}T${m[2].padStart(2, '0')}:${m[3]}` : null;\n};\n\nconst stop = (s = {}) => ({\n  name: clean(s.name),\n  street: clean(s.street),\n  city: clean(s.city),\n  state: clean(s.state)?.toUpperCase().slice(0, 2) ?? null,\n  zip: String(s.zip ?? '').match(/\\d{5}/)?.[0] ?? null,\n  window_start: time(s.window_start),\n  window_end: time(s.window_end),\n  instructions: clean(s.instructions),\n});\n\nconst today = new Date().toISOString().slice(0, 10);\nconst tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);\n\nreturn $input.all().map(({ json: input }) => {\n  const src = input.order ?? {};\n  const issues = [];\n\n  // Store orders have no pickup: they ship from the default warehouse during opening hours.\n  const pickup = src.pickup\n    ? stop(src.pickup)\n    : stop({ ...cfg.default_pickup, window_start: `${tomorrow}T09:00`, window_end: `${tomorrow}T17:00` });\n  const dropoff = stop(src.dropoff ?? {});\n\n  const customer = {\n    company: clean(src.customer?.company),\n    contact_name: clean(src.customer?.contact_name),\n    email: clean(src.customer?.email ?? input.sender_email)?.toLowerCase() ?? null,\n    phone: phone(src.customer?.phone),\n  };\n\n  const items = (Array.isArray(src.items) ? src.items : []).map((it) => ({\n    description: clean(it.description) ?? 'Freight',\n    quantity: parseInt(it.quantity, 10) || null,\n    unit: ['pallet', 'box', 'piece', 'other'].includes(it.unit) ? it.unit : 'other',\n    weight_lbs: Number(it.weight_lbs) || null,\n  }));\n\n  const order = {\n    customer,\n    reference_number: clean(src.reference_number),\n    service_level: ['same_day', 'scheduled', 'recurring'].includes(src.service_level) ? src.service_level : 'scheduled',\n    pickup,\n    dropoff,\n    items,\n    vehicle_type: clean(src.vehicle_type),\n    special_instructions: clean(src.special_instructions),\n  };\n\n  for (const [side, s] of [['pickup', pickup], ['dropoff', dropoff]]) {\n    const missing = ['street', 'city', 'state', 'zip'].filter((f) => !s[f]);\n    if (missing.length) issues.push(`Missing ${side} ${missing.join(', ')}`);\n  }\n  if (!pickup.window_start) issues.push('Missing pickup date/time');\n  else if (pickup.window_start.slice(0, 10) < today) issues.push(`Pickup date ${pickup.window_start.slice(0, 10)} is in the past`);\n  if (pickup.window_start && pickup.window_end && pickup.window_end < pickup.window_start) issues.push('Pickup window ends before it starts');\n  if (pickup.window_start && dropoff.window_end && dropoff.window_end < pickup.window_start) issues.push('Delivery deadline is before pickup');\n  if (!items.length || items.every((i) => !i.quantity)) issues.push('Missing item quantity');\n  if (!customer.email) issues.push('No customer email for the confirmation');\n\n  // Same customer + reference + route + day = same order, even if it arrives twice by different channels.\n  // Without both streets and a date that key would collide across unrelated orders, so fall back to the content.\n  const hasRoute = pickup.street && dropoff.street && pickup.window_start;\n  const key_source = (hasRoute\n    ? [\n        customer.email ?? customer.company ?? '',\n        order.reference_number ?? '',\n        pickup.street, pickup.zip ?? '',\n        dropoff.street, dropoff.zip ?? '',\n        pickup.window_start.slice(0, 10),\n      ]\n    : ['content', input.sender_email ?? '', (input.raw_text ?? JSON.stringify(src)).replace(/\\s+/g, ' ')]\n  ).join('|').toLowerCase();\n\n  return {\n    json: {\n      intake_id: input.intake_id,\n      source: input.source,\n      received_at: input.received_at,\n      sender_email: input.sender_email,\n      subject: input.subject,\n      extraction: input.extraction ?? { method: 'unknown', confidence: 0, missing_fields: [] },\n      order,\n      issues,\n      key_source,\n    },\n  };\n});\n"
+      },
+      "id": "a00950bd-9281-580a-9597-57feebc4b46e",
+      "name": "Validate & Normalize Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "type": "SHA256",
+        "value": "={{ $json.key_source }}",
+        "dataPropertyName": "idempotency_key",
+        "encoding": "hex"
+      },
+      "id": "0debbd21-84d1-5295-b535-11f9fb204c1d",
+      "name": "Idempotency Key",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.GOOGLE_MAPS_BASE_URL || 'https://maps.googleapis.com' }}/maps/api/geocode/json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "address",
+              "value": "={{ [$json.order.pickup.street, $json.order.pickup.city, $json.order.pickup.state, $json.order.pickup.zip].filter(Boolean).join(', ') }}"
+            },
+            {
+              "name": "components",
+              "value": "country:US"
+            },
+            {
+              "name": "key",
+              "value": "={{ $env.GOOGLE_MAPS_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "fddc3139-efb6-5f77-84a8-46503b016aaf",
+      "name": "Maps: Geocode Pickup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.GOOGLE_MAPS_BASE_URL || 'https://maps.googleapis.com' }}/maps/api/geocode/json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "address",
+              "value": "={{ [$('Idempotency Key').item.json.order.dropoff.street, $('Idempotency Key').item.json.order.dropoff.city, $('Idempotency Key').item.json.order.dropoff.state, $('Idempotency Key').item.json.order.dropoff.zip].filter(Boolean).join(', ') }}"
+            },
+            {
+              "name": "components",
+              "value": "country:US"
+            },
+            {
+              "name": "key",
+              "value": "={{ $env.GOOGLE_MAPS_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "34156a63-7d35-5a01-8802-3a2cf5943dd4",
+      "name": "Maps: Geocode Dropoff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = JSON.parse(JSON.stringify($('Idempotency Key').item.json));\n\nconst PRECISE = ['ROOFTOP', 'RANGE_INTERPOLATED'];\nconst readGeocode = (res) => {\n  const r = res?.results?.[0];\n  if (res?.status !== 'OK' || !r) return { verified: false, status: res?.status ?? 'ERROR' };\n  return {\n    verified: PRECISE.includes(r.geometry.location_type) && !r.partial_match,\n    status: res.status,\n    location_type: r.geometry.location_type,\n    formatted_address: r.formatted_address,\n    lat: r.geometry.location.lat,\n    lng: r.geometry.location.lng,\n    place_id: r.place_id,\n  };\n};\n\nctx.geo = {\n  pickup: readGeocode($('Maps: Geocode Pickup').item.json),\n  dropoff: readGeocode($json),\n};\n\nfor (const side of ['pickup', 'dropoff']) {\n  const g = ctx.geo[side];\n  if (!g.verified) ctx.issues.push(`Google Maps could not verify the ${side} address (${g.location_type ?? g.status})`);\n}\n\nctx.quote_request = {\n  pickup: { lat: ctx.geo.pickup.lat ?? null, lng: ctx.geo.pickup.lng ?? null },\n  dropoff: { lat: ctx.geo.dropoff.lat ?? null, lng: ctx.geo.dropoff.lng ?? null },\n  items: ctx.order.items,\n  service_level: ctx.order.service_level,\n  vehicle_type: ctx.order.vehicle_type,\n};\n\nreturn { json: ctx };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "7d08fc41-f7ae-5042-8401-37509a1cd770",
+      "name": "Apply Address Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.TMS_BASE_URL }}/api/v1/shipments",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "idempotency_key",
+              "value": "={{ $json.idempotency_key }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.TMS_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "cb1b5395-e063-5ae7-ae10-d6bc598a70bc",
+      "name": "TMS: Find Existing Shipment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3080,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "e2d1ca80-7ffc-5675-85b9-e8ac4f218455",
+              "leftValue": "={{ ($json.data ?? []).length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d224561b-f8d6-5a16-8d7e-9e6565f58567",
+      "name": "Already in TMS?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Apply Address Validation').item.json;\nconst existing = $json.data[0];\n\nreturn {\n  json: {\n    status: 'duplicate',\n    message: `Already in the TMS as ${existing.id} (${existing.status}). Nothing new was created.`,\n    intake_id: ctx.intake_id,\n    shipment_id: existing.id,\n    shipment_status: existing.status,\n    idempotency_key: ctx.idempotency_key,\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "f5761a57-7e8d-567f-91ad-f94060119361",
+      "name": "Result: Duplicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3520,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TMS_BASE_URL }}/api/v1/quotes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.TMS_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Apply Address Validation').item.json.quote_request) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "ea139788-a4ee-5447-8068-0d85fd3bbe0d",
+      "name": "TMS: Get Quote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3520,
+        420
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input is the TMS quote, or { error } when the TMS could not price the order.\nconst cfg = $('Load Config').first().json.config;\nconst ctx = $('Apply Address Validation').item.json;\nconst quote = typeof $json.total === 'number' ? $json : null;\n\nconst reasons = [];\nif (ctx.extraction.confidence < cfg.min_confidence) {\n  reasons.push(`AI confidence ${ctx.extraction.confidence} is below ${cfg.min_confidence}`);\n}\nreasons.push(...ctx.issues);\nif (!quote) {\n  const err = $json.error;\n  const raw = String((typeof err === 'string' ? err : err?.message ?? err?.description) ?? '');\n  const detail = raw.match(/\"error\\\\?\":\\s*\\\\?\"([^\"\\\\]+)/)?.[1] ?? raw.replace(/^\\d{3} - /, '');\n  reasons.push(`TMS could not quote this order${detail ? `: ${detail}` : ''}`);\n} else if (quote.total > cfg.max_auto_price) {\n  reasons.push(`Quote $${quote.total} is above the $${cfg.max_auto_price} auto-book limit`);\n}\n\nconst withGeo = (stop, g) => ({\n  ...stop,\n  formatted_address: g.formatted_address ?? null,\n  lat: g.lat ?? null,\n  lng: g.lng ?? null,\n});\n\nconst tms_payload = {\n  reference_number: ctx.order.reference_number,\n  source: ctx.source,\n  external_ref: ctx.intake_id,\n  customer: ctx.order.customer,\n  service_level: ctx.order.service_level,\n  pickup: withGeo(ctx.order.pickup, ctx.geo.pickup),\n  dropoff: withGeo(ctx.order.dropoff, ctx.geo.dropoff),\n  items: ctx.order.items,\n  vehicle_type: ctx.order.vehicle_type ?? quote?.vehicle_type ?? null,\n  special_instructions: ctx.order.special_instructions,\n  quote_id: quote?.quote_id ?? null,\n  price: quote?.total ?? null,\n  ai: { method: ctx.extraction.method, model: ctx.extraction.model ?? null, confidence: ctx.extraction.confidence },\n};\n\nreturn {\n  json: {\n    ...ctx,\n    quote,\n    needs_review: reasons.length > 0,\n    review_reasons: reasons,\n    review_expires_at: Math.floor(Date.now() / 1000) + 24 * 3600,\n    tms_payload,\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "08c76dea-c927-5c1c-9ad1-8b56ae05c4f4",
+      "name": "Decide: Auto-book or Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3740,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "5fff1c07-01cc-5d9a-9d7d-cd8a9985c261",
+              "leftValue": "={{ $json.needs_review }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5d6c82b5-2bad-59ad-923b-55b20ab338bb",
+      "name": "Needs Human Review?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3960,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TMS_BASE_URL }}/api/v1/shipments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.TMS_API_KEY }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.idempotency_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ...$json.tms_payload, status: 'booked', note: 'Auto-booked by AI order intake' }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "3d8f700c-8149-5e81-8c26-2af5e1368736",
+      "name": "TMS: Create Shipment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4180,
+        280
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TMS_BASE_URL }}/api/v1/shipments/{{ $json.id }}/dispatch",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.TMS_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "65a57eac-eb6d-5341-b43a-525c2f7857b4",
+      "name": "TMS: Dispatch to Route",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4400,
+        280
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input is a dispatched TMS shipment. Shared by the intake and review workflows.\nconst s = $json;\nconst at = (t) => (t ? String(t).replace('T', ' ') : 'TBD');\nconst place = (stop = {}) => stop.formatted_address || [stop.street, stop.city, stop.state, stop.zip].filter(Boolean).join(', ');\nconst ref = s.reference_number ? ` (your ref ${s.reference_number})` : '';\n\nconst body = [\n  `Hi ${s.customer?.contact_name ?? 'there'},`,\n  '',\n  `Your delivery is booked${ref}.`,\n  '',\n  `Shipment:      ${s.id}`,\n  `Pickup:        ${place(s.pickup)}`,\n  `Pickup ETA:    ${at(s.route?.pickup_eta)}`,\n  `Deliver to:    ${place(s.dropoff)}`,\n  `Delivery ETA:  ${at(s.route?.eta)}`,\n  `Vehicle:       ${s.vehicle_type ?? 'Assigned by dispatch'}`,\n  `Driver:        ${s.route?.driver?.name ?? 'Assigned shortly'}`,\n  s.price != null ? `Price:         $${s.price.toFixed(2)}` : null,\n  '',\n  s.route?.tracking_url ? `Track it live: ${s.route.tracking_url}` : null,\n  '',\n  'Reply to this email if anything needs to change.',\n  '',\n  'Dispatch team',\n].filter((line) => line !== null);\n\nreturn {\n  json: {\n    shipment_id: s.id,\n    email: {\n      personalizations: [{ to: [{ email: s.customer?.email }] }],\n      subject: `Booked: ${s.id}${ref}`,\n      content: [{ type: 'text/plain', value: body.join('\\n') }],\n    },\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "64ad2d02-1489-5afe-8f3e-43849a645a8e",
+      "name": "Compose Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4620,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SENDGRID_BASE_URL || 'https://api.sendgrid.com' }}/v3/mail/send",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SENDGRID_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ...$json.email, from: { email: $env.FROM_EMAIL || 'dispatch@example.com', name: $env.FROM_NAME || 'Dispatch' } }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "a91a1528-65f6-5dcb-b392-ae4e35d2cf9c",
+      "name": "Email: Customer Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4840,
+        280
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Decide: Auto-book or Review').item.json;\nconst shipment = $('TMS: Dispatch to Route').item.json;\n\nreturn {\n  json: {\n    status: 'booked',\n    message: `Booked and dispatched as ${shipment.id}. Confirmation emailed to ${shipment.customer?.email}.`,\n    intake_id: ctx.intake_id,\n    shipment_id: shipment.id,\n    route_id: shipment.route?.id ?? null,\n    driver: shipment.route?.driver?.name ?? null,\n    pickup_eta: shipment.route?.pickup_eta ?? null,\n    delivery_eta: shipment.route?.eta ?? null,\n    price: ctx.quote?.total ?? null,\n    extraction: ctx.extraction,\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "66e530d6-c6d4-5217-b9ae-4d0721b6bec4",
+      "name": "Result: Booked",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5060,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TMS_BASE_URL }}/api/v1/shipments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.TMS_API_KEY }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.idempotency_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ...$json.tms_payload, status: 'draft', note: 'Held for review: ' + $json.review_reasons.join('; ') }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "df39f731-2730-55a2-8ac8-734be53f1f33",
+      "name": "TMS: Create Draft Shipment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4180,
+        560
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.id + '.' + $('Decide: Auto-book or Review').item.json.review_expires_at }}",
+        "dataPropertyName": "review_sig",
+        "secret": "={{ $env.REVIEW_SIGNING_SECRET }}",
+        "encoding": "hex"
+      },
+      "id": "b2693fc9-a60f-529e-8e1b-95e08b4d0885",
+      "name": "Sign Review Link",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        4400,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input is the draft shipment plus review_sig from \"Sign Review Link\".\nconst cfg = $('Load Config').first().json.config;\nconst ctx = $('Decide: Auto-book or Review').item.json;\nconst draft = $json;\nconst order = ctx.order;\n\nconst link = (action) =>\n  `${cfg.public_url}/webhook/order-review?shipment_id=${encodeURIComponent(draft.id)}` +\n  `&action=${action}&exp=${ctx.review_expires_at}&sig=${draft.review_sig}`;\n\nconst place = (s) => [s.street, s.city, s.state, s.zip].filter(Boolean).join(', ') || '_missing_';\nconst items = order.items.map((i) => `${i.quantity ?? '?'} ${i.unit} - ${i.description}`).join('\\n') || '_none_';\n\nconst slack = {\n  text: `Order needs review: ${draft.id}`,\n  blocks: [\n    { type: 'header', text: { type: 'plain_text', text: `Order needs review: ${draft.id}` } },\n    { type: 'section', text: { type: 'mrkdwn', text: `*Why it was held*\\n${ctx.review_reasons.map((r) => `- ${r}`).join('\\n')}` } },\n    {\n      type: 'section',\n      fields: [\n        { type: 'mrkdwn', text: `*Customer*\\n${order.customer.company ?? order.customer.email ?? '_unknown_'}` },\n        { type: 'mrkdwn', text: `*Reference*\\n${order.reference_number ?? '_none_'}` },\n        { type: 'mrkdwn', text: `*Pickup*\\n${place(order.pickup)}\\n${order.pickup.window_start ?? '_no time_'}` },\n        { type: 'mrkdwn', text: `*Dropoff*\\n${place(order.dropoff)}\\n${order.dropoff.window_end ? `by ${order.dropoff.window_end}` : ''}` },\n        { type: 'mrkdwn', text: `*Items*\\n${items}` },\n        { type: 'mrkdwn', text: `*Quote*\\n${ctx.quote ? `$${ctx.quote.total} - ${ctx.quote.vehicle_type}` : '_not priced_'}` },\n      ],\n    },\n    {\n      type: 'context',\n      elements: [{ type: 'mrkdwn', text: `Source: ${ctx.source} | AI confidence ${ctx.extraction.confidence} | ${ctx.subject ?? 'no subject'}` }],\n    },\n    {\n      type: 'actions',\n      elements: [\n        { type: 'button', style: 'primary', text: { type: 'plain_text', text: 'Approve & dispatch' }, url: link('approve') },\n        { type: 'button', style: 'danger', text: { type: 'plain_text', text: 'Reject' }, url: link('reject') },\n        { type: 'button', text: { type: 'plain_text', text: 'Edit in TMS' }, url: `${cfg.tms_ui_url}/?shipment=${encodeURIComponent(draft.id)}` },\n      ],\n    },\n  ],\n};\n\nreturn { json: { shipment_id: draft.id, slack } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "afdd06d7-fac3-533c-9855-0335ed2ae6b7",
+      "name": "Compose Review Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4620,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.slack) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "ffffe120-58bf-56e4-a58e-c428a0a2f257",
+      "name": "Slack: Request Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4840,
+        560
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Decide: Auto-book or Review').item.json;\nconst draft = $('TMS: Create Draft Shipment').item.json;\n\nreturn {\n  json: {\n    status: 'needs_review',\n    message: `Saved as draft ${draft.id} in the TMS and sent to Slack for approval.`,\n    intake_id: ctx.intake_id,\n    shipment_id: draft.id,\n    review_reasons: ctx.review_reasons,\n    price: ctx.quote?.total ?? null,\n    extraction: ctx.extraction,\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "7feb99fe-aa9d-5c1c-b141-f977950134fe",
+      "name": "Result: Needs Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5060,
+        560
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: Order Intake": {
+      "main": [
+        [
+          {
+            "node": "Normalize: Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email: Orders Inbox": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Attachment": {
+      "main": [
+        [
+          {
+            "node": "Normalize: Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shopify: Order Created": {
+      "main": [
+        [
+          {
+            "node": "Normalize: Shopify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive: New CSV in Folder": {
+      "main": [
+        [
+          {
+            "node": "Drive: Download CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive: Download CSV": {
+      "main": [
+        [
+          {
+            "node": "Parse CSV Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse CSV Rows": {
+      "main": [
+        [
+          {
+            "node": "Normalize: CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize: Webhook": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize: Email": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize: Shopify": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize: CSV": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Needs AI Extraction?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs AI Extraction?": {
+      "main": [
+        [
+          {
+            "node": "Build AI Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate & Normalize Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI Request": {
+      "main": [
+        [
+          {
+            "node": "AI: Extract Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI: Extract Order": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Output": {
+      "main": [
+        [
+          {
+            "node": "Validate & Normalize Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Normalize Order": {
+      "main": [
+        [
+          {
+            "node": "Idempotency Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Idempotency Key": {
+      "main": [
+        [
+          {
+            "node": "Maps: Geocode Pickup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Maps: Geocode Pickup": {
+      "main": [
+        [
+          {
+            "node": "Maps: Geocode Dropoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Maps: Geocode Dropoff": {
+      "main": [
+        [
+          {
+            "node": "Apply Address Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Address Validation": {
+      "main": [
+        [
+          {
+            "node": "TMS: Find Existing Shipment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TMS: Find Existing Shipment": {
+      "main": [
+        [
+          {
+            "node": "Already in TMS?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already in TMS?": {
+      "main": [
+        [
+          {
+            "node": "Result: Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TMS: Get Quote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TMS: Get Quote": {
+      "main": [
+        [
+          {
+            "node": "Decide: Auto-book or Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide: Auto-book or Review": {
+      "main": [
+        [
+          {
+            "node": "Needs Human Review?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Human Review?": {
+      "main": [
+        [
+          {
+            "node": "TMS: Create Draft Shipment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TMS: Create Shipment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TMS: Create Shipment": {
+      "main": [
+        [
+          {
+            "node": "TMS: Dispatch to Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TMS: Dispatch to Route": {
+      "main": [
+        [
+          {
+            "node": "Compose Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Email: Customer Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email: Customer Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Result: Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TMS: Create Draft Shipment": {
+      "main": [
+        [
+          {
+            "node": "Sign Review Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Review Link": {
+      "main": [
+        [
+          {
+            "node": "Compose Review Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Review Request": {
+      "main": [
+        [
+          {
+            "node": "Slack: Request Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Request Review": {
+      "main": [
+        [
+          {
+            "node": "Result: Needs Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "errorWorkflow": "aiIntakeAlerts01"
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

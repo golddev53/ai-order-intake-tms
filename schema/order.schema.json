@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LogisticsOrder",
+  "description": "A B2B delivery order extracted from an email, PDF, spreadsheet or store order. Times are local ISO 8601 (YYYY-MM-DDTHH:MM) without a timezone offset.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["customer", "reference_number", "service_level", "pickup", "dropoff", "items", "vehicle_type", "special_instructions", "confidence", "missing_fields"],
+  "properties": {
+    "customer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["company", "contact_name", "email", "phone"],
+      "properties": {
+        "company": { "type": ["string", "null"] },
+        "contact_name": { "type": ["string", "null"] },
+        "email": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] }
+      }
+    },
+    "reference_number": { "type": ["string", "null"], "description": "Customer PO, order or reference number." },
+    "service_level": { "type": "string", "enum": ["same_day", "scheduled", "recurring"] },
+    "pickup": { "$ref": "#/$defs/stop" },
+    "dropoff": { "$ref": "#/$defs/stop" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description", "quantity", "unit", "weight_lbs"],
+        "properties": {
+          "description": { "type": "string" },
+          "quantity": { "type": ["integer", "null"] },
+          "unit": { "type": "string", "enum": ["pallet", "box", "piece", "other"] },
+          "weight_lbs": { "type": ["number", "null"] }
+        }
+      }
+    },
+    "vehicle_type": { "type": ["string", "null"], "description": "Only if the customer asked for a specific vehicle." },
+    "special_instructions": { "type": ["string", "null"] },
+    "confidence": { "type": "number", "description": "0-1. How sure you are that every extracted field is correct and complete." },
+    "missing_fields": { "type": "array", "items": { "type": "string" }, "description": "Dotted paths of required fields that were not in the text, e.g. pickup.zip." }
+  },
+  "$defs": {
+    "stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "street", "city", "state", "zip", "window_start", "window_end", "instructions"],
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "street": { "type": ["string", "null"] },
+        "city": { "type": ["string", "null"] },
+        "state": { "type": ["string", "null"], "description": "2-letter US state code." },
+        "zip": { "type": ["string", "null"] },
+        "window_start": { "type": ["string", "null"] },
+        "window_end": { "type": ["string", "null"] },
+        "instructions": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "source": "email",
+  "from": "maria.lopez@acmesupply.com",
+  "subject": "Pickup request - PO 88123",
+  "text": "Hi team,\n\nPlease schedule the pickup below.\n\nPickup: Acme Supply Co, 2150 Mission College Blvd, Santa Clara, CA 95054\nPickup window: {{TOMORROW}} 09:00 - 11:00\nDeliver to: Bay Medical Group, 450 Sutter St, San Francisco, CA 94108\nDelivery by: {{TOMORROW}} 15:00\nItems: 3 pallets of medical supplies, approx 1,200 lbs\nContact: Maria Lopez, (408) 555-0142\nNotes: Dock 4. Call 30 minutes before arrival.\n\nThanks,\nMaria"
+}

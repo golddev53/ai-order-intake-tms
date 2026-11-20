@@ -1,0 +1,85 @@
+{
+  "id": "aiIntakeAlerts01",
+  "name": "AI Order Intake - Error Alerts",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b91ff3bd-38d2-52e7-9ee8-b77f78daa46b",
+      "name": "On Workflow Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { execution = {}, workflow = {} } = $json;\nconst error = execution.error ?? {};\n\nconst blocks = [\n  { type: 'header', text: { type: 'plain_text', text: `Workflow failed: ${workflow.name ?? 'unknown'}` } },\n  {\n    type: 'section',\n    text: {\n      type: 'mrkdwn',\n      text: `*Node:* ${execution.lastNodeExecuted ?? error.node?.name ?? 'unknown'}\\n*Error:* ${error.message ?? 'no message'}\\n*Mode:* ${execution.mode ?? '-'} | *Execution:* ${execution.id ?? '-'}`,\n    },\n  },\n];\n\nif (execution.url) {\n  blocks.push({\n    type: 'actions',\n    elements: [{ type: 'button', text: { type: 'plain_text', text: 'Open execution' }, url: execution.url }],\n  });\n}\n\nreturn { json: { slack: { text: `Workflow failed: ${workflow.name}`, blocks } } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "1d5e87a2-3410-5330-9f7a-5981fe708d64",
+      "name": "Compose Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.slack) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "e34395b6-ba19-5e06-be77-c194b02f0ba2",
+      "name": "Slack: Alert Ops",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "On Workflow Error": {
+      "main": [
+        [
+          {
+            "node": "Compose Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Alert": {
+      "main": [
+        [
+          {
+            "node": "Slack: Alert Ops",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

@@ -1,0 +1,38 @@
+{
+  "source": "customer_portal",
+  "order": {
+    "customer": {
+      "company": "Lone Star Bloom Wholesale",
+      "contact_name": "Jenna Park",
+      "email": "orders@lonestarbloom.com",
+      "phone": "650-555-0187"
+    },
+    "reference_number": "LSB-20931",
+    "service_level": "scheduled",
+    "pickup": {
+      "name": "Lone Star Bloom Cold Room",
+      "street": "1180 Elko Dr",
+      "city": "Sunnyvale",
+      "state": "CA",
+      "zip": "94089",
+      "window_start": "{{TOMORROW}}T06:00",
+      "window_end": "{{TOMORROW}}T07:00",
+      "instructions": "Use the side entrance"
+    },
+    "dropoff": {
+      "name": "Fairmont Hotel Events",
+      "street": "170 S Market St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113",
+      "window_start": null,
+      "window_end": "{{TOMORROW}}T09:00",
+      "instructions": "Loading dock B"
+    },
+    "items": [
+      { "description": "Floral arrangements (keep cold)", "quantity": 24, "unit": "box", "weight_lbs": 180 }
+    ],
+    "vehicle_type": "9ft Refrigerator VAN",
+    "special_instructions": "Keep at 34-38F"
+  }
+}

@@ -1,0 +1,42 @@
+x-n8n: &n8n
+  image: docker.n8n.io/n8nio/n8n:2.48.6
+  env_file: .env
+  environment:
+    N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+    N8N_WEBHOOK_URL: http://localhost:5678/
+    N8N_DIAGNOSTICS_ENABLED: "false"
+  volumes:
+    - n8n_data:/home/node/.n8n
+    - ./workflows:/workflows:ro
+
+services:
+  sandbox:
+    build: ./sandbox
+    environment:
+      TMS_API_KEY: ${TMS_API_KEY:-demo-tms-key}
+    ports:
+      - "8000:8000"
+
+  # Imports and publishes the workflows from ./workflows, then exits.
+  # Re-running it overwrites edits made in the n8n editor with the files on disk.
+  n8n-import:
+    <<: *n8n
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - >
+        n8n import:workflow --separate --input=/workflows &&
+        for id in aiIntakeAlerts01 aiIntakeReview01 aiIntakeMain0001; do n8n publish:workflow --id=$$id; done
+
+  n8n:
+    <<: *n8n
+    ports:
+      - "5678:5678"
+    depends_on:
+      n8n-import:
+        condition: service_completed_successfully
+      sandbox:
+        condition: service_started
+
+volumes:
+  n8n_data:

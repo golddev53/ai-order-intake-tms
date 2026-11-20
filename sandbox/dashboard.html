@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sandbox TMS - AI Order Intake</title>
+  <style>
+    :root { --bg:#0b1020; --card:#131c33; --line:rgba(148,163,184,.15); --text:#e6ebf5; --muted:#94a3b8; --accent:#22d3ee; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.5 Inter, system-ui, sans-serif; background:var(--bg); color:var(--text); }
+    header { display:flex; justify-content:space-between; align-items:center; padding:18px 28px; border-bottom:1px solid var(--line); }
+    header h1 { margin:0; font-size:18px; }
+    header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
+    button { background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:8px; padding:7px 14px; cursor:pointer; }
+    button:hover { color:var(--text); border-color:var(--accent); }
+    main { display:grid; grid-template-columns: 1.6fr 1fr; gap:20px; padding:24px 28px; }
+    section { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; min-width:0; }
+    h2 { margin:0 0 14px; font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--accent); }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { color:var(--muted); font-weight:500; font-size:12px; }
+    .muted { color:var(--muted); font-size:12px; }
+    .badge { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; }
+    .draft { background:rgba(251,191,36,.15); color:#fbbf24; }
+    .booked { background:rgba(34,211,238,.15); color:#22d3ee; }
+    .dispatched { background:rgba(52,211,153,.15); color:#34d399; }
+    .cancelled { background:rgba(248,113,113,.15); color:#f87171; }
+    .feed { display:grid; gap:10px; }
+    .msg { border:1px solid var(--line); border-radius:10px; padding:12px; background:#0e1528; }
+    .msg pre { white-space:pre-wrap; margin:6px 0 0; font:12px/1.5 ui-monospace, monospace; color:#cbd5e1; }
+    .msg a { display:inline-block; margin:8px 8px 0 0; padding:5px 12px; border-radius:7px; background:var(--accent); color:#04111d; font-weight:600; text-decoration:none; font-size:12px; }
+    .msg a.danger { background:#f87171; }
+    .empty { color:var(--muted); padding:16px 0; }
+    @media (max-width: 1000px) { main { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Sandbox TMS</h1>
+      <p>Mock TMS, Slack and email for the AI Order Intake workflows. Refreshes every 2 seconds.</p>
+    </div>
+    <button id="reset">Reset sandbox</button>
+  </header>
+  <main>
+    <section>
+      <h2>Shipments in TMS</h2>
+      <div id="shipments"></div>
+    </section>
+    <div style="display:grid; gap:20px; align-content:start">
+      <section><h2>Slack (#dispatch)</h2><div id="slack" class="feed"></div></section>
+      <section><h2>Customer emails</h2><div id="email" class="feed"></div></section>
+    </div>
+  </main>
+
+  <script>
+    const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const addr = (s) => s ? [s.street, s.city, s.state].filter(Boolean).join(", ") || "<i>missing</i>" : "<i>missing</i>";
+    const time = (t) => t ? new Date(t).toLocaleTimeString() : "";
+
+    function renderShipments(rows) {
+      if (!rows.length) return '<p class="empty">No shipments yet. Send a sample order to the n8n webhook.</p>';
+      return `<table><thead><tr><th>Shipment</th><th>Status</th><th>Customer / Ref</th><th>Pickup &rarr; Dropoff</th><th>Vehicle / Route</th></tr></thead><tbody>${
+        rows.map((s) => `<tr>
+          <td><strong>${esc(s.id)}</strong><div class="muted">${time(s.created_at)} &middot; ${esc(s.source)}</div></td>
+          <td><span class="badge ${esc(s.status)}">${esc(s.status)}</span></td>
+          <td>${esc(s.customer?.company || s.customer?.contact_name || "-")}<div class="muted">${esc(s.reference_number || "no ref")}</div></td>
+          <td>${addr(s.pickup)}<div class="muted">&rarr; ${addr(s.dropoff)}</div></td>
+          <td>${esc(s.vehicle_type || "-")}<div class="muted">${s.route ? `${esc(s.route.id)} &middot; ${esc(s.route.driver.name)}` : ""}</div></td>
+        </tr>`).join("")
+      }</tbody></table>`;
+    }
+
+    function slackText(payload) {
+      const lines = [];
+      const links = [];
+      for (const b of payload.blocks || []) {
+        if (b.text?.text) lines.push(b.text.text);
+        for (const f of b.fields || []) lines.push(f.text);
+        for (const e of b.elements || []) {
+          if (e.url) links.push(`<a href="${esc(e.url)}" target="_blank" class="${e.style === "danger" ? "danger" : ""}">${esc(e.text?.text)}</a>`);
+          else if (e.text) lines.push(e.text);
+        }
+      }
+      return { text: lines.join("\n") || payload.text || "", links: links.join("") };
+    }
+
+    function renderSlack(items) {
+      if (!items.length) return '<p class="empty">No messages.</p>';
+      return items.map(({ at, payload }) => {
+        const { text, links } = slackText(payload);
+        return `<div class="msg"><span class="muted">${time(at)}</span><pre>${esc(text)}</pre>${links}</div>`;
+      }).join("");
+    }
+
+    function renderEmail(items) {
+      if (!items.length) return '<p class="empty">No emails.</p>';
+      return items.map(({ at, payload }) => `<div class="msg">
+        <span class="muted">${time(at)} &middot; to ${esc(payload.personalizations?.[0]?.to?.map((t) => t.email).join(", "))}</span>
+        <div><strong>${esc(payload.subject)}</strong></div>
+        <pre>${esc(payload.content?.[0]?.value)}</pre></div>`).join("");
+    }
+
+    async function refresh() {
+      try {
+        const data = await (await fetch("/mock/state")).json();
+        document.getElementById("shipments").innerHTML = renderShipments(data.shipments);
+        document.getElementById("slack").innerHTML = renderSlack(data.slack);
+        document.getElementById("email").innerHTML = renderEmail(data.email);
+      } catch (e) { /* sandbox restarting */ }
+    }
+
+    document.getElementById("reset").onclick = async () => { await fetch("/mock/reset", { method: "POST" }); refresh(); };
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>
